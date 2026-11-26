@@ -32,7 +32,7 @@ import (
 const (
 	DefaultAuthURL     = "https://www.inoreader.com/oauth2/auth"
 	DefaultTokenURL    = "https://www.inoreader.com/oauth2/token"
-	DefaultRedirectURI = "http://127.0.0.1:8787/callback"
+	DefaultRedirectURI = "https://127.0.0.1:8787/callback"
 	DefaultScope       = "read write"
 	pinnedOAuthHost    = "www.inoreader.com"
 

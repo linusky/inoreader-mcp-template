@@ -170,7 +170,7 @@ func (c *Client) GetArticles(ctx context.Context, opts GetArticlesOptions) (*Art
 		StreamID:     cleanText(raw.ID, 512),
 		Title:        stripHTMLAndTruncate(raw.Title, 160),
 		Count:        len(articles),
-		Continuation: raw.Continuation,
+		Continuation: cleanText(raw.Continuation, 256),
 		Articles:     articles,
 	}, nil
 }
@@ -205,6 +205,11 @@ func (c *Client) ListTags(ctx context.Context) ([]TagEntry, error) {
 	if err := json.Unmarshal(body, &resp); err != nil {
 		return nil, fmt.Errorf("decode tag/list response: %w", err)
 	}
+	for i := range resp.Tags {
+		resp.Tags[i].ID = cleanText(resp.Tags[i].ID, 512)
+		resp.Tags[i].SortID = cleanText(resp.Tags[i].SortID, 64)
+		resp.Tags[i].Type = cleanText(resp.Tags[i].Type, 64)
+	}
 	return resp.Tags, nil
 }
 
@@ -217,6 +222,10 @@ func (c *Client) GetUnreadCounts(ctx context.Context) (*UnreadCountResponse, err
 	var resp UnreadCountResponse
 	if err := json.Unmarshal(body, &resp); err != nil {
 		return nil, fmt.Errorf("decode unread-count response: %w", err)
+	}
+	for i := range resp.UnreadCounts {
+		resp.UnreadCounts[i].ID = cleanText(resp.UnreadCounts[i].ID, 512)
+		resp.UnreadCounts[i].NewestItemTimestampUsec = cleanText(resp.UnreadCounts[i].NewestItemTimestampUsec, 64)
 	}
 	return &resp, nil
 }
@@ -247,8 +256,14 @@ func (c *Client) AddSubscription(ctx context.Context, feedURL, title, folder str
 		return nil, fmt.Errorf("decode subscription/quickadd response: %w", err)
 	}
 	if qa.StreamID == "" {
+		if qa.Error != "" {
+			return nil, fmt.Errorf("quickadd failed for %q: %s", cleanURL, cleanText(qa.Error, 200))
+		}
 		return nil, fmt.Errorf("no RSS/Atom feed found at %q", cleanURL)
 	}
+	qa.Query = cleanText(qa.Query, maxURLChars)
+	qa.StreamID = cleanText(qa.StreamID, 512)
+	qa.StreamName = stripHTMLAndTruncate(qa.StreamName, 200)
 
 	if title != "" || folder != "" {
 		if err := c.EditSubscription(ctx, qa.StreamID, title, folder, ""); err != nil {
@@ -583,6 +598,13 @@ func stripHTMLPass(raw string, maxBytes int) string {
 			}
 			j++
 		}
+		if j >= len(raw) && quote != 0 {
+			// Unclosed quote inside tag; fall back to scanning for '>' without quote mode.
+			j = i + 1
+			for j < len(raw) && raw[j] != '>' {
+				j++
+			}
+		}
 		if j >= len(raw) {
 			// Unterminated tag at end of input; stop.
 			break
@@ -660,6 +682,9 @@ func cleanText(s string, maxRunes int) string {
 			if runeCount > 0 {
 				pendingSpace = true
 			}
+			continue
+		}
+		if unicode.IsControl(r) || unicode.Is(unicode.Cf, r) || (r >= 0xE0000 && r <= 0xE007F) {
 			continue
 		}
 		if pendingSpace {

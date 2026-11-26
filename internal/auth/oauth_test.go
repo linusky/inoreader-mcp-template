@@ -3,6 +3,7 @@ package auth
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -275,5 +276,67 @@ func TestAutomaticConcurrentRefreshDeduplicated(t *testing.T) {
 	}
 	if saved.RefreshToken != "keep-my-refresh-token" {
 		t.Fatalf("refresh_token was not preserved: %q", saved.RefreshToken)
+	}
+}
+
+func TestHTTPSLoopbackLoginFlow(t *testing.T) {
+	tokenSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"access_token":  "https-access",
+			"refresh_token": "https-refresh",
+			"token_type":    "Bearer",
+			"scope":         "read write",
+			"expires_in":    3600,
+		})
+	}))
+	defer tokenSrv.Close()
+
+	store := keychain.NewMemoryStore()
+	var wg sync.WaitGroup
+	defer wg.Wait()
+
+	httpsClient := &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, //nolint:gosec // test-only self-signed loopback cert
+		},
+	}
+
+	mgr, err := NewManager(Config{
+		ClientID:     "app-id",
+		ClientSecret: "app-secret",
+		RedirectURI:  "https://127.0.0.1:0/callback",
+		AuthURL:      "https://www.inoreader.com/oauth2/auth",
+		TokenURL:     tokenSrv.URL,
+		Store:        store,
+		OpenBrowser: func(authURL string) error {
+			u, err := url.Parse(authURL)
+			if err != nil {
+				return err
+			}
+			q := u.Query()
+			cbURL := q.Get("redirect_uri") + "?code=https-code&state=" + url.QueryEscape(q.Get("state"))
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				resp, err := httpsClient.Get(cbURL)
+				if err == nil {
+					_, _ = io.ReadAll(resp.Body)
+					resp.Body.Close()
+				}
+			}()
+			return nil
+		},
+	})
+	if err != nil {
+		t.Fatalf("NewManager: %v", err)
+	}
+
+	tok, err := mgr.Login(context.Background(), nil)
+	if err != nil {
+		t.Fatalf("HTTPS Login failed: %v", err)
+	}
+	if tok.AccessToken != "https-access" {
+		t.Fatalf("unexpected token: %+v", tok)
 	}
 }

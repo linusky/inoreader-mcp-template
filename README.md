@@ -51,8 +51,8 @@ Works with any MCP-compatible AI harness (Claude Desktop, Claude Code, Cursor, A
 ## Installation
 
 ```bash
-git clone https://github.com/<your-username>/inoreader-mcp.git
-cd inoreader-mcp
+git clone https://github.com/zigbyte/inoreader-mcp-template.git
+cd inoreader-mcp-template
 make build
 ```
 
@@ -71,7 +71,6 @@ Export your InoReader Developer App credentials and run `login`:
 ```bash
 export INOREADER_CLIENT_ID="your-inoreader-app-id"
 export INOREADER_CLIENT_SECRET="your-inoreader-app-key"
-export INOREADER_REDIRECT_URI="https://127.0.0.1:8787/callback"
 
 ./bin/inoreader-mcp login
 ```
@@ -128,7 +127,7 @@ claude mcp add inoreader \
 | :--- | :---: | :--- | :--- |
 | `INOREADER_CLIENT_ID` | Yes* | — | InoReader OAuth2 App ID |
 | `INOREADER_CLIENT_SECRET` | Yes* | — | InoReader OAuth2 App Key |
-| `INOREADER_REDIRECT_URI` | No | `http://127.0.0.1:8787/callback` | Loopback OAuth2 redirect URI (`http` or `https` on `127.0.0.1` / `localhost`; use `https://127.0.0.1:8787/callback` for InoReader) |
+| `INOREADER_REDIRECT_URI` | No | `https://127.0.0.1:8787/callback` | Loopback OAuth2 redirect URI (`https` or `http` on `127.0.0.1` / `localhost`) |
 | `INOREADER_SCOPE` | No | `read write` | OAuth2 scopes (`read` or `read write`) |
 
 *\*Required for `login` and automatic token refresh.*
