@@ -19,7 +19,7 @@ import (
 
 func TestRedirectAndEndpointValidation(t *testing.T) {
 	badRedirects := []string{
-		"https://127.0.0.1:8787/callback",
+		"ftp://127.0.0.1:8787/callback",
 		"http://0.0.0.0:8787/callback",
 		"http://evil.example.com:8787/callback",
 		"http://127.0.0.1/callback",
