@@ -1,0 +1,28 @@
+# Build outputs
+/bin/
+/inoreader-mcp
+*.exe
+*.test
+*.out
+coverage.txt
+
+# Environment & local secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.dpapi
+.mcp.json
+mcp.json
+*.local.json
+
+# Logs & profiling
+*.log
+*.prof
+
+# OS / Editor artifacts
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
