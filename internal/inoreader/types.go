@@ -74,6 +74,7 @@ type RawItem struct {
 	Canonical  []Link      `json:"canonical"`
 	Alternate  []Link      `json:"alternate"`
 	Summary    ItemSummary `json:"summary"`
+	Content    ItemSummary `json:"content"`
 	Origin     ItemOrigin  `json:"origin"`
 }
 
@@ -139,10 +140,11 @@ type Category struct {
 
 // QuickAddResponse is returned by POST /reader/api/0/subscription/quickadd.
 type QuickAddResponse struct {
-	Query      string `json:"query"`
-	NumResults int    `json:"numResults"`
-	StreamID   string `json:"streamId"`
-	StreamName string `json:"streamName"`
+	Query      string  `json:"query"`
+	NumResults FlexInt `json:"numResults"`
+	StreamID   string  `json:"streamId"`
+	StreamName string  `json:"streamName"`
+	Error      string  `json:"error,omitempty"`
 }
 
 // TagListResponse is returned by GET /reader/api/0/tag/list.
@@ -151,10 +153,10 @@ type TagListResponse struct {
 }
 
 type TagEntry struct {
-	ID          string `json:"id"`
-	SortID      string `json:"sortid,omitempty"`
-	Type        string `json:"type,omitempty"`
-	UnreadCount int    `json:"unread_count,omitempty"`
+	ID          string  `json:"id"`
+	SortID      string  `json:"sortid,omitempty"`
+	Type        string  `json:"type,omitempty"`
+	UnreadCount FlexInt `json:"unread_count,omitempty"`
 }
 
 // UnreadCountResponse is returned by GET /reader/api/0/unread-count.
@@ -201,11 +203,15 @@ func NormalizeArticle(raw RawItem, includeContent bool, maxSummaryChars int) Art
 			}
 		}
 	}
-	if includeContent && raw.Summary.Content != "" {
+	bodyText := raw.Summary.Content
+	if bodyText == "" {
+		bodyText = raw.Content.Content
+	}
+	if includeContent && bodyText != "" {
 		if maxSummaryChars <= 0 {
 			maxSummaryChars = 2000
 		}
-		a.Summary = stripHTMLAndTruncate(raw.Summary.Content, maxSummaryChars)
+		a.Summary = stripHTMLAndTruncate(bodyText, maxSummaryChars)
 	}
 	return a
 }
@@ -229,7 +235,7 @@ func sanitizeHTTPURL(raw string) string {
 		return ""
 	}
 	u, err := url.Parse(raw)
-	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" || u.User != nil {
 		return ""
 	}
 	return raw

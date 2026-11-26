@@ -315,3 +315,44 @@ func TestClientBlocksRedirectsToPreventTokenLeak(t *testing.T) {
 		t.Fatalf("expected redirect error, got %v", err)
 	}
 }
+
+func TestFlexIntAndSanitizationHardening(t *testing.T) {
+	// FlexInt: string, int, empty, null, invalid
+	var uc UnreadCountResponse
+	if err := json.Unmarshal([]byte(`{"max":"1000","unreadcounts":[{"id":"feed/a","count":"42"},{"id":"feed/b","count":7},{"id":"feed/c","count":""},{"id":"feed/d","count":null}]}`), &uc); err != nil {
+		t.Fatalf("FlexInt unmarshal: %v", err)
+	}
+	if uc.Max != 1000 || uc.UnreadCounts[0].Count != 42 || uc.UnreadCounts[1].Count != 7 || uc.UnreadCounts[2].Count != 0 || uc.UnreadCounts[3].Count != 0 {
+		t.Fatalf("unexpected FlexInt values: %+v", uc)
+	}
+	var bad FlexInt
+	if err := json.Unmarshal([]byte(`"not-a-number"`), &bad); err == nil {
+		t.Fatal("expected error for invalid FlexInt string")
+	}
+
+	// Control, bidi, and Unicode Tag characters stripped by cleanText
+	dirty := "Hello\x1b[31mWorld\u202eEvil\U000E0041"
+	if got := cleanText(dirty, 200); got != "Hello[31mWorldEvil" {
+		t.Fatalf("cleanText did not strip control/bidi/tag chars: %q", got)
+	}
+
+	// Unclosed quote handling in stripHTMLAndTruncate
+	if got := stripHTMLAndTruncate(`<a href="oops>visible text`, 200); got != "visible text" {
+		t.Fatalf("unclosed quote dropped text: %q", got)
+	}
+
+	// sanitizeHTTPURL rejects userinfo
+	if got := sanitizeHTTPURL("https://www.inoreader.com@evil.example/a"); got != "" {
+		t.Fatalf("expected empty for URL with userinfo, got %q", got)
+	}
+
+	// NormalizeArticle falls back to Content when Summary is empty
+	art := NormalizeArticle(RawItem{
+		ID:      "id1",
+		Title:   "Title",
+		Content: ItemSummary{Content: "<p>Full body</p>"},
+	}, true, 200)
+	if art.Summary != "Full body" {
+		t.Fatalf("expected Content fallback, got %q", art.Summary)
+	}
+}

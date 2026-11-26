@@ -189,9 +189,10 @@ func RegisterInoReaderTools(s *Server, client *inoreader.Client, authReader Auth
 				}
 			}
 			return map[string]any{
-				"folders": folders,
-				"tags":    userTags,
-				"other":   other,
+				"content_trust": inoreader.ContentTrustUntrustedRSS,
+				"folders":       folders,
+				"tags":          userTags,
+				"other":         other,
 			}, nil
 		},
 	})
@@ -243,9 +244,10 @@ func RegisterInoReaderTools(s *Server, client *inoreader.Client, authReader Auth
 				return nil, err
 			}
 			return map[string]any{
-				"status":      "subscribed",
-				"stream_id":   res.StreamID,
-				"stream_name": res.StreamName,
+				"content_trust": inoreader.ContentTrustUntrustedRSS,
+				"status":        "subscribed",
+				"stream_id":     res.StreamID,
+				"stream_name":   res.StreamName,
 			}, nil
 		},
 	})

@@ -32,7 +32,11 @@ func run(args []string) int {
 	var subArgs []string
 	if len(args) > 0 {
 		if args[0] == "--read-only" {
-			subArgs = args
+			if len(args) > 1 && args[1] == "serve" {
+				subArgs = append([]string{"--read-only"}, args[2:]...)
+			} else {
+				subArgs = args
+			}
 		} else {
 			cmd = args[0]
 			subArgs = args[1:]
@@ -164,7 +168,7 @@ Commands:
 Environment Variables:
   INOREADER_CLIENT_ID       InoReader OAuth2 App ID (required for login and token refresh)
   INOREADER_CLIENT_SECRET   InoReader OAuth2 App Key (required for login and token refresh)
-  INOREADER_REDIRECT_URI    Loopback callback URI (default: http://127.0.0.1:8787/callback)
+  INOREADER_REDIRECT_URI    Loopback callback URI (default: https://127.0.0.1:8787/callback)
   INOREADER_SCOPE           OAuth2 scope (default: "read write")
 `)
 }
