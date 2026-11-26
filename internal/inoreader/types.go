@@ -1,10 +1,46 @@
 package inoreader
 
 import (
+	"encoding/json"
+	"fmt"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 )
+
+// FlexInt unmarshals either a JSON number or a quoted integer string.
+type FlexInt int
+
+func (f *FlexInt) UnmarshalJSON(data []byte) error {
+	s := strings.TrimSpace(string(data))
+	if s == "" || s == "null" {
+		*f = 0
+		return nil
+	}
+	if strings.HasPrefix(s, `"`) {
+		var str string
+		if err := json.Unmarshal(data, &str); err != nil {
+			return err
+		}
+		if str == "" {
+			*f = 0
+			return nil
+		}
+		v, err := strconv.Atoi(str)
+		if err != nil {
+			return fmt.Errorf("invalid integer string %q: %w", str, err)
+		}
+		*f = FlexInt(v)
+		return nil
+	}
+	var v int
+	if err := json.Unmarshal(data, &v); err != nil {
+		return err
+	}
+	*f = FlexInt(v)
+	return nil
+}
 
 // Standard InoReader / Google Reader system stream & state identifiers.
 const (
@@ -123,14 +159,14 @@ type TagEntry struct {
 
 // UnreadCountResponse is returned by GET /reader/api/0/unread-count.
 type UnreadCountResponse struct {
-	Max          int           `json:"max"`
+	Max          FlexInt       `json:"max"`
 	UnreadCounts []UnreadCount `json:"unreadcounts"`
 }
 
 type UnreadCount struct {
-	ID                      string `json:"id"`
-	Count                   int    `json:"count"`
-	NewestItemTimestampUsec string `json:"newestItemTimestampUsec,omitempty"`
+	ID                      string  `json:"id"`
+	Count                   FlexInt `json:"count"`
+	NewestItemTimestampUsec string  `json:"newestItemTimestampUsec,omitempty"`
 }
 
 // NormalizeArticle converts a RawItem into a compact, sanitized Article.

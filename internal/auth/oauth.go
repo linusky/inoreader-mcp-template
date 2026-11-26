@@ -2,13 +2,19 @@ package auth
 
 import (
 	"context"
+	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/subtle"
+	"crypto/tls"
+	"crypto/x509"
+	"crypto/x509/pkix"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"math/big"
 	"net"
 	"net/http"
 	"net/url"
@@ -179,8 +185,8 @@ func validateLoopbackRedirectURI(raw string) error {
 	if err != nil {
 		return fmt.Errorf("invalid redirect URI: %w", err)
 	}
-	if u.Scheme != "http" {
-		return errors.New("redirect URI must use http scheme on loopback")
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return errors.New("redirect URI must use http or https scheme on loopback")
 	}
 	host := u.Hostname()
 	if host != "127.0.0.1" && host != "localhost" {
@@ -415,9 +421,21 @@ func (m *Manager) Login(ctx context.Context, statusOut io.Writer) (*Token, error
 		WriteTimeout:      15 * time.Second,
 	}
 
+	serveLn := ln
+	if u.Scheme == "https" {
+		tlsCert, err := generateSelfSignedLoopbackCert()
+		if err != nil {
+			return nil, fmt.Errorf("generate loopback TLS cert: %w", err)
+		}
+		serveLn = tls.NewListener(ln, &tls.Config{
+			Certificates: []tls.Certificate{tlsCert},
+			MinVersion:   tls.VersionTLS12,
+		})
+	}
+
 	serveErrCh := make(chan error, 1)
 	go func() {
-		if err := srv.Serve(ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		if err := srv.Serve(serveLn); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			serveErrCh <- err
 		}
 	}()
@@ -607,6 +625,36 @@ func sanitizeShort(s string) string {
 		return s[:120]
 	}
 	return s
+}
+
+func generateSelfSignedLoopbackCert() (tls.Certificate, error) {
+	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		return tls.Certificate{}, err
+	}
+	serial, err := rand.Int(rand.Reader, new(big.Int).Lsh(big.NewInt(1), 128))
+	if err != nil {
+		return tls.Certificate{}, err
+	}
+	now := time.Now()
+	tmpl := x509.Certificate{
+		SerialNumber: serial,
+		Subject:      pkix.Name{CommonName: "127.0.0.1"},
+		NotBefore:    now.Add(-time.Minute),
+		NotAfter:     now.Add(24 * time.Hour),
+		KeyUsage:     x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
+		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		IPAddresses:  []net.IP{net.ParseIP("127.0.0.1"), net.ParseIP("::1")},
+		DNSNames:     []string{"localhost"},
+	}
+	der, err := x509.CreateCertificate(rand.Reader, &tmpl, &tmpl, &priv.PublicKey, priv)
+	if err != nil {
+		return tls.Certificate{}, err
+	}
+	return tls.Certificate{
+		Certificate: [][]byte{der},
+		PrivateKey:  priv,
+	}, nil
 }
 
 const callbackSuccessHTML = `<!doctype html>

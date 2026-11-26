@@ -41,7 +41,7 @@ Works with any MCP-compatible AI harness (Claude Desktop, Claude Code, Cursor, A
    - Sign in to InoReader and open **Preferences → Developer** (`https://www.inoreader.com/preferences/`).
    - Create a new application:
      - **Application type:** Web / Native
-     - **Redirect URI:** `http://127.0.0.1:8787/callback`
+     - **Redirect URI:** `https://127.0.0.1:8787/callback` *(InoReader requires `https://`)*
      - **Scopes:** `read` and `write`
    - Note your **App ID** (`INOREADER_CLIENT_ID`) and **App Key** (`INOREADER_CLIENT_SECRET`).
 3. **Linux users only:** Ensure `libsecret` / `secret-tool` is installed and a keyring daemon (e.g., GNOME Keyring or KWallet) is running.
@@ -71,11 +71,12 @@ Export your InoReader Developer App credentials and run `login`:
 ```bash
 export INOREADER_CLIENT_ID="your-inoreader-app-id"
 export INOREADER_CLIENT_SECRET="your-inoreader-app-key"
+export INOREADER_REDIRECT_URI="https://127.0.0.1:8787/callback"
 
 ./bin/inoreader-mcp login
 ```
 
-Your browser will open to InoReader's OAuth2 consent page. After you approve access, the tokens are saved securely in your OS keychain.
+Your browser will open to InoReader's OAuth2 consent page. After you approve access, your browser will redirect to `https://127.0.0.1:8787/callback`—accept the ephemeral self-signed certificate warning (e.g., **Advanced → Proceed**) so the loopback server can receive the authorization code and save the tokens securely in your OS keychain.
 
 Verify authentication status at any time:
 
@@ -127,7 +128,7 @@ claude mcp add inoreader \
 | :--- | :---: | :--- | :--- |
 | `INOREADER_CLIENT_ID` | Yes* | — | InoReader OAuth2 App ID |
 | `INOREADER_CLIENT_SECRET` | Yes* | — | InoReader OAuth2 App Key |
-| `INOREADER_REDIRECT_URI` | No | `http://127.0.0.1:8787/callback` | Loopback OAuth2 redirect URI (`127.0.0.1` or `localhost` only) |
+| `INOREADER_REDIRECT_URI` | No | `http://127.0.0.1:8787/callback` | Loopback OAuth2 redirect URI (`http` or `https` on `127.0.0.1` / `localhost`; use `https://127.0.0.1:8787/callback` for InoReader) |
 | `INOREADER_SCOPE` | No | `read write` | OAuth2 scopes (`read` or `read write`) |
 
 *\*Required for `login` and automatic token refresh.*
